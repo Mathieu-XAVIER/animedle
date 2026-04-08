@@ -23,8 +23,8 @@
   --wrong:       #1c1c30;
 
   --text:        #ededfc;
-  --muted:       #52526e;
-  --subtle:      #2a2a42;
+  --muted:       #8888aa;
+  --subtle:      #38385a;
 }
 
 *, *::before, *::after { box-sizing: border-box; }

@@ -4,7 +4,6 @@ const navLinks = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/import', label: 'Import Jikan' },
   { href: '/admin/staging', label: 'Staging' },
-  { href: '/admin/defis', label: 'Défis quotidiens' },
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

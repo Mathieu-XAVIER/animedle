@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useClassiqueGame } from '@/hooks/useClassiqueGame'
 import CharacterSearch from '@/components/game/CharacterSearch'
@@ -19,6 +20,7 @@ interface Props {
 const MAX_ATTEMPTS = 6
 
 export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCharacterId }: Props) {
+  const router = useRouter()
   const { state, submitGuess } = useClassiqueGame(sessionId, isIllimite ? targetCharacterId : undefined)
 
   const animeMap = useMemo(
@@ -28,6 +30,10 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
 
   const isActive = state.status === 'playing'
   const excludedIds = state.attempts.map(a => a.character.id)
+
+  const handleReplay = useCallback(() => {
+    router.refresh()
+  }, [router])
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
@@ -44,16 +50,24 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
           <span className="text-xs tracking-widest uppercase" style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
             {isIllimite ? '∞ ILLIMITÉ' : '⚔ CLASSIQUE'}
           </span>
-          {/* Attempt dots */}
-          <div className="flex gap-1">
-            {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
-              <div key={i} className="w-1.5 h-1.5 rounded-full transition-all duration-300" style={{
-                background: i < state.attempts.length
-                  ? (state.status === 'won' && i === state.attempts.length - 1 ? '#22c55e' : 'var(--accent)')
-                  : 'var(--subtle)',
-              }} />
-            ))}
-          </div>
+          {/* Dots de tentatives (mode daily uniquement) */}
+          {!isIllimite && (
+            <div className="flex gap-1">
+              {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
+                <div key={i} className="w-1.5 h-1.5 rounded-full transition-all duration-300" style={{
+                  background: i < state.attempts.length
+                    ? (state.status === 'won' && i === state.attempts.length - 1 ? '#22c55e' : 'var(--accent)')
+                    : 'var(--subtle)',
+                }} />
+              ))}
+            </div>
+          )}
+          {/* Compteur d'essais (mode illimité) */}
+          {isIllimite && state.attempts.length > 0 && (
+            <span className="text-xs tabular-nums" style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
+              {state.attempts.length} essai{state.attempts.length > 1 ? 's' : ''}
+            </span>
+          )}
         </div>
       </header>
 
@@ -87,9 +101,11 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
               <h1 className="text-xs uppercase tracking-widest font-semibold" style={{ fontFamily: 'var(--font-chakra)', color: 'var(--muted)' }}>
                 Devine le personnage
               </h1>
-              <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                {MAX_ATTEMPTS - state.attempts.length} essai{MAX_ATTEMPTS - state.attempts.length > 1 ? 's' : ''} restant{MAX_ATTEMPTS - state.attempts.length > 1 ? 's' : ''}
-              </span>
+              {!isIllimite && (
+                <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                  {MAX_ATTEMPTS - state.attempts.length} essai{MAX_ATTEMPTS - state.attempts.length > 1 ? 's' : ''} restant{MAX_ATTEMPTS - state.attempts.length > 1 ? 's' : ''}
+                </span>
+              )}
             </div>
 
             {/* Search */}
@@ -98,13 +114,13 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
             {/* Legend */}
             <div className="flex gap-4 text-xs" style={{ color: 'var(--muted)' }}>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded" style={{ background: '#16a34a' }} /> Exact
+                <span className="w-3 h-3 rounded" style={{ background: 'var(--correct)' }} /> Exact
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded bg-amber-600" /> Proche
+                <span className="w-3 h-3 rounded" style={{ background: 'var(--partial)' }} /> Proche
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded" style={{ background: 'var(--subtle)' }} /> Faux
+                <span className="w-3 h-3 rounded" style={{ background: 'var(--wrong)' }} /> Faux
               </span>
             </div>
 
@@ -113,8 +129,8 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
               {state.attempts.map((entry, i) => (
                 <GuessRow key={i} entry={entry} animeMap={animeMap} index={i} />
               ))}
-              {/* Placeholder rows */}
-              {Array.from({ length: Math.max(0, MAX_ATTEMPTS - state.attempts.length) }).map((_, i) => (
+              {/* Placeholder rows (mode daily uniquement) */}
+              {!isIllimite && Array.from({ length: Math.max(0, MAX_ATTEMPTS - state.attempts.length) }).map((_, i) => (
                 <div key={`ph-${i}`} className="h-16 rounded-xl border-2 border-dashed"
                   style={{ borderColor: 'var(--border)', opacity: Math.max(0.15, 0.45 - i * 0.07) }} />
               ))}
@@ -130,6 +146,8 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
         targetCharacter={state.targetCharacter}
         animeMap={animeMap}
         mode={isIllimite ? 'Illimité' : 'Classique'}
+        isIllimite={isIllimite}
+        onReplay={isIllimite ? handleReplay : undefined}
       />
     </div>
   )

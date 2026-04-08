@@ -30,10 +30,15 @@ export interface JikanCharacterEntry {
     mal_id: number
     name: string
     name_kanji?: string
-    images?: { jpg?: { image_url?: string } }
+    images?: { jpg?: { image_url?: string; small_image_url?: string }; webp?: { image_url?: string } }
     favorites?: number
+    url?: string
   }
   role: string
+  voice_actors?: Array<{
+    person: { mal_id: number; name: string; url?: string }
+    language: string
+  }>
 }
 
 export interface JikanCharacterDetail {
@@ -41,9 +46,12 @@ export interface JikanCharacterDetail {
     mal_id: number
     name: string
     name_kanji?: string
-    images?: { jpg?: { image_url?: string } }
+    nicknames?: string[]
+    images?: { jpg?: { image_url?: string }; webp?: { image_url?: string } }
     favorites?: number
     about?: string
+    anime?: Array<{ role: string; anime: { mal_id: number; title: string } }>
+    manga?: Array<{ role: string; manga: { mal_id: number; title: string } }>
   }
 }
 

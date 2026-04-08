@@ -50,19 +50,39 @@ export default function CharacterSearch({ onSelect, excludeIds = [], disabled }:
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Rechercher un personnage..."
         disabled={disabled}
-        className="w-full bg-gray-800 text-white px-4 py-3 rounded-xl border border-gray-700 focus:outline-none focus:border-indigo-500 placeholder-gray-500 disabled:opacity-40"
+        className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-colors duration-200 disabled:opacity-40"
+        style={{
+          background: 'var(--card)',
+          borderColor: 'var(--border)',
+          color: 'var(--text)',
+          fontFamily: 'var(--font-barlow)',
+        }}
+        onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+        onBlurCapture={e => (e.currentTarget.style.borderColor = 'var(--border)')}
       />
+      <style>{`input::placeholder { color: var(--muted); }`}</style>
       {open && results.length > 0 && (
-        <ul className="absolute z-10 w-full mt-1 bg-gray-900 border border-gray-700 rounded-xl overflow-hidden shadow-xl">
+        <ul className="absolute z-10 w-full mt-1 rounded-xl overflow-hidden shadow-2xl border"
+          style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           {results.map(r => (
             <li
               key={r.id}
               onMouseDown={() => handleSelect(r)}
-              className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-800 cursor-pointer"
+              className="flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors duration-150"
+              style={{ borderBottom: '1px solid var(--border)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-hover)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              <span className="text-white text-sm">{r.display_name}</span>
+              <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{r.display_name}</span>
               {r.short_title && (
-                <span className="text-xs text-indigo-400 bg-indigo-400/10 px-2 py-0.5 rounded-full">{r.short_title}</span>
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                  color: 'var(--accent)',
+                  background: 'var(--accent-dim)',
+                  fontFamily: 'var(--font-chakra)',
+                  letterSpacing: '0.04em',
+                }}>
+                  {r.short_title}
+                </span>
               )}
             </li>
           ))}

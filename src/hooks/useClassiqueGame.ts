@@ -120,7 +120,7 @@ export function useClassiqueGame(sessionId: string, targetCharacterId?: string) 
       const attempts = [...prev.attempts, newEntry]
       let status: GameStatus = 'playing'
       if (data.isCorrect) status = 'won'
-      else if (data.attemptsCount >= MAX_ATTEMPTS) status = 'lost'
+      else if (!isIllimite && data.attemptsCount >= MAX_ATTEMPTS) status = 'lost'
 
       const next: GameState = {
         ...prev,
