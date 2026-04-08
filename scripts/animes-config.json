@@ -1,0 +1,7 @@
+{
+  "one-piece":    { "malId": 21,    "title": "One Piece",          "shortTitle": "OP"  },
+  "jjk":          { "malId": 40748, "title": "Jujutsu Kaisen",     "shortTitle": "JJK" },
+  "demon-slayer": { "malId": 38000, "title": "Demon Slayer",       "shortTitle": "DS"  },
+  "snk":          { "malId": 16498, "title": "Shingeki no Kyojin", "shortTitle": "SNK" },
+  "mha":          { "malId": 31964, "title": "My Hero Academia",   "shortTitle": "MHA" }
+}
