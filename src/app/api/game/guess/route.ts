@@ -77,6 +77,9 @@ export async function POST(request: NextRequest) {
       faction: guessChar.faction,
       power_type: guessChar.power_type,
       weapon_type: guessChar.weapon_type,
+      status: guessChar.status,
+      species: guessChar.species,
+      age_range: guessChar.age_range,
     },
   }
 

@@ -16,6 +16,9 @@ export interface GuessEntry {
     faction: string | null
     power_type: string | null
     weapon_type: string | null
+    status: string | null
+    species: string | null
+    age_range: string | null
   }
   comparison: GuessComparison
 }
@@ -30,10 +33,10 @@ interface GameState {
 
 const MAX_ATTEMPTS = 6
 
-function getStorageKey(isIllimite: boolean, challengeId?: string | null) {
-  return isIllimite
-    ? `illimite_${challengeId ?? 'new'}`
-    : `classique_${getTodayUTC()}`
+function getStorageKey(isIllimite: boolean, challengeId?: string | null, animeSlug?: string) {
+  if (isIllimite) return `illimite_${challengeId ?? 'new'}`
+  const base = `classique_${getTodayUTC()}`
+  return animeSlug ? `${base}_${animeSlug}` : base
 }
 
 function loadFromStorage(key: string): Partial<GameState> | null {
@@ -49,7 +52,7 @@ function saveToStorage(key: string, state: GameState) {
   try { localStorage.setItem(key, JSON.stringify(state)) } catch { /* ignore */ }
 }
 
-export function useClassiqueGame(sessionId: string, targetCharacterId?: string) {
+export function useClassiqueGame(sessionId: string, targetCharacterId?: string, animeSlug?: string) {
   const isIllimite = !!targetCharacterId
 
   const [state, setState] = useState<GameState>({
@@ -60,7 +63,7 @@ export function useClassiqueGame(sessionId: string, targetCharacterId?: string) 
     error: null,
   })
 
-  const storageKey = getStorageKey(isIllimite, targetCharacterId)
+  const storageKey = getStorageKey(isIllimite, targetCharacterId, animeSlug)
 
   useEffect(() => {
     if (isIllimite) {
@@ -85,7 +88,9 @@ export function useClassiqueGame(sessionId: string, targetCharacterId?: string) 
 
   const loadDaily = useCallback(async () => {
     setState(prev => ({ ...prev, status: 'loading', error: null }))
-    const res = await fetch('/api/game/daily?mode=classique')
+    const params = new URLSearchParams({ mode: 'classique' })
+    if (animeSlug) params.set('anime', animeSlug)
+    const res = await fetch(`/api/game/daily?${params}`)
     if (!res.ok) {
       setState(prev => ({ ...prev, status: 'idle', error: 'Aucun défi disponible aujourd\'hui.' }))
       return
@@ -96,7 +101,7 @@ export function useClassiqueGame(sessionId: string, targetCharacterId?: string) 
       saveToStorage(storageKey, next)
       return next
     })
-  }, [storageKey])
+  }, [storageKey, animeSlug])
 
   const submitGuess = useCallback(async (characterId: string) => {
     if (state.status !== 'playing' || !state.challengeId) return

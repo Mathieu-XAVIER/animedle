@@ -155,6 +155,9 @@ export type Database = {
           slug: string
           source_external_id: string | null
           weapon_type: string | null
+          status: string | null
+          species: string | null
+          age_range: string | null
         }
         Insert: {
           anime_id: string
@@ -175,6 +178,9 @@ export type Database = {
           slug: string
           source_external_id?: string | null
           weapon_type?: string | null
+          status?: string | null
+          species?: string | null
+          age_range?: string | null
         }
         Update: {
           anime_id?: string
@@ -195,6 +201,9 @@ export type Database = {
           slug?: string
           source_external_id?: string | null
           weapon_type?: string | null
+          status?: string | null
+          species?: string | null
+          age_range?: string | null
         }
         Relationships: [
           {

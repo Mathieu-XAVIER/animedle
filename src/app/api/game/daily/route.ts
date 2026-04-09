@@ -15,8 +15,21 @@ export async function GET(request: NextRequest) {
   const mode = request.nextUrl.searchParams.get('mode') as 'classique' | 'citation' | null
   if (!mode) return NextResponse.json({ error: 'mode requis' }, { status: 400 })
 
+  const animeSlug = request.nextUrl.searchParams.get('anime') // optionnel — filtre par anime
   const supabase = await createClient()
   const today = getTodayUTC()
+
+  // Résoudre l'anime_id depuis le slug si fourni
+  let animeId: string | null = null
+  if (animeSlug) {
+    const { data: anime } = await supabase
+      .from('animes')
+      .select('id')
+      .eq('slug', animeSlug)
+      .single()
+    if (!anime) return NextResponse.json({ error: 'Anime introuvable' }, { status: 404 })
+    animeId = anime.id
+  }
 
   // Chercher un défi existant pour aujourd'hui
   let { data: challenge } = await supabase
@@ -55,11 +68,13 @@ export async function GET(request: NextRequest) {
       challenge = created
     } else {
       // Pour classique / silhouette : choisir un personnage actif de façon déterministe
-      const { data: characters } = await supabase
+      let charQuery = supabase
         .from('characters')
         .select('id')
         .eq('is_active', true)
         .order('created_at')
+      if (animeId) charQuery = charQuery.eq('anime_id', animeId)
+      const { data: characters } = await charQuery
 
       if (!characters?.length) {
         return NextResponse.json({ error: 'Aucun personnage disponible' }, { status: 404 })

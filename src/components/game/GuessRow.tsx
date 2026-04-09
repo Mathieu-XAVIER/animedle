@@ -16,6 +16,9 @@ const ATTRIBUTES = [
   { key: 'faction',    label: 'Faction' },
   { key: 'power_type', label: 'Pouvoir' },
   { key: 'weapon_type',label: 'Arme' },
+  { key: 'species',    label: 'Espèce' },
+  { key: 'status',     label: 'Statut' },
+  { key: 'age_range',  label: 'Âge' },
 ] as const
 
 export default function GuessRow({ entry, animeMap, index }: Props) {

@@ -6,23 +6,35 @@ export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q')?.trim() ?? ''
   if (q.length < 2) return NextResponse.json([])
 
+  const animeSlug = request.nextUrl.searchParams.get('anime')
   const normalized = normalizeString(q)
   const supabase = await createClient()
 
+  // Résoudre l'anime_id si un slug est fourni
+  let animeId: string | null = null
+  if (animeSlug) {
+    const { data: anime } = await supabase.from('animes').select('id').eq('slug', animeSlug).single()
+    animeId = anime?.id ?? null
+  }
+
   // Chercher par display_name + via les aliases
-  const [{ data: byName }, { data: byAlias }] = await Promise.all([
-    supabase
-      .from('characters')
-      .select('id, display_name, anime_id, animes(short_title)')
-      .eq('is_active', true)
-      .ilike('display_name', `%${q}%`)
-      .limit(8),
-    supabase
-      .from('character_aliases')
-      .select('character_id, characters(id, display_name, anime_id, animes(short_title))')
-      .ilike('normalized_alias', `%${normalized}%`)
-      .limit(8),
-  ])
+  let nameQuery = supabase
+    .from('characters')
+    .select('id, display_name, anime_id, animes(short_title)')
+    .eq('is_active', true)
+    .ilike('display_name', `%${q}%`)
+    .limit(8)
+  if (animeId) nameQuery = nameQuery.eq('anime_id', animeId)
+
+  let aliasQuery = supabase
+    .from('character_aliases')
+    .select('character_id, characters(id, display_name, anime_id, animes(short_title))')
+    .ilike('normalized_alias', `%${normalized}%`)
+    .limit(8)
+  // Filtrage alias par anime via join imbriqué — pas directement supporté par Supabase PostgREST
+  // On filtrera côté application après récupération
+
+  const [{ data: byName }, { data: byAlias }] = await Promise.all([nameQuery, aliasQuery])
 
   // Fusionner et dédupliquer
   const seen = new Set<string>()
@@ -43,6 +55,8 @@ export async function GET(request: NextRequest) {
   for (const a of byAlias ?? []) {
     const c = a.characters as { id: string; display_name: string; anime_id: string; animes: { short_title: string | null } | null } | null
     if (c && !seen.has(c.id)) {
+      // Filtrer par anime côté application si nécessaire
+      if (animeId && c.anime_id !== animeId) continue
       seen.add(c.id)
       results.push({
         id: c.id,

@@ -22,6 +22,10 @@ interface ExtractedAttributes {
   power_type?: string | null
   weapon_type?: string | null
   description_short?: string | null
+  status?: 'alive' | 'deceased' | 'unknown' | null
+  species?: string | null
+  age_range?: 'enfant' | 'adolescent' | 'adulte' | 'ancien' | null
+  voice_actor_jp?: string | null
 }
 
 interface JikanRaw {
@@ -56,7 +60,7 @@ export default function CharacterForm({ staging, animes }: Props) {
   const ext = jikan.extracted ?? {}
   const hasExtracted = Object.keys(ext).length > 0
 
-  // Pré-remplissage depuis les données Jikan + enrichissement IA
+  // Pré-remplissage depuis les données source + attributs extraits
   const [form, setForm] = useState({
     display_name: staging.name ?? '',
     name: staging.name ?? '',
@@ -70,6 +74,9 @@ export default function CharacterForm({ staging, animes }: Props) {
     weapon_type: ext.weapon_type ?? '',
     difficulty: staging.role_source === 'Main' ? 'easy' : 'medium',
     description_short: ext.description_short ?? (jikanAbout ? truncate(jikanAbout, 220) : ''),
+    status: ext.status ?? '',
+    species: ext.species ?? '',
+    age_range: ext.age_range ?? '',
   })
 
   const initialAliases: AliasEntry[] = [
@@ -169,10 +176,14 @@ export default function CharacterForm({ staging, animes }: Props) {
             )}
             {hasExtracted && (
               <div className="mt-1 pt-1 border-t border-gray-700 space-y-0.5">
-                {ext.gender && <p><span className="text-gray-500">Genre IA :</span> <span className="text-green-400">{ext.gender}</span></p>}
-                {ext.faction && <p><span className="text-gray-500">Faction IA :</span> <span className="text-green-400">{ext.faction}</span></p>}
-                {ext.power_type && <p><span className="text-gray-500">Pouvoir IA :</span> <span className="text-green-400">{ext.power_type}</span></p>}
-                {ext.weapon_type && <p><span className="text-gray-500">Arme IA :</span> <span className="text-green-400">{ext.weapon_type}</span></p>}
+                {ext.gender && <p><span className="text-gray-500">Genre :</span> <span className="text-green-400">{ext.gender}</span></p>}
+                {ext.faction && <p><span className="text-gray-500">Faction :</span> <span className="text-green-400">{ext.faction}</span></p>}
+                {ext.power_type && <p><span className="text-gray-500">Pouvoir :</span> <span className="text-green-400">{ext.power_type}</span></p>}
+                {ext.weapon_type && <p><span className="text-gray-500">Arme :</span> <span className="text-green-400">{ext.weapon_type}</span></p>}
+                {ext.species && <p><span className="text-gray-500">Espèce :</span> <span className="text-green-400">{ext.species}</span></p>}
+                {ext.status && <p><span className="text-gray-500">Statut :</span> <span className="text-green-400">{ext.status}</span></p>}
+                {ext.age_range && <p><span className="text-gray-500">Âge :</span> <span className="text-green-400">{ext.age_range}</span></p>}
+                {ext.voice_actor_jp && <p><span className="text-gray-500">VA JP :</span> <span className="text-green-400">{ext.voice_actor_jp}</span></p>}
               </div>
             )}
           </div>
@@ -245,16 +256,41 @@ export default function CharacterForm({ staging, animes }: Props) {
         </div>
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className={labelClass}>Faction / Affiliation {ext.faction && <span className="text-green-500">✦IA</span>}</label>
+            <label className={labelClass}>Faction / Affiliation {ext.faction && <span className="text-green-500">✦</span>}</label>
             <input className={inputClass} value={form.faction} onChange={e => updateForm('faction', e.target.value)} placeholder="ex: Marines" />
           </div>
           <div>
-            <label className={labelClass}>Type de pouvoir {ext.power_type && <span className="text-green-500">✦IA</span>}</label>
+            <label className={labelClass}>Type de pouvoir {ext.power_type && <span className="text-green-500">✦</span>}</label>
             <input className={inputClass} value={form.power_type} onChange={e => updateForm('power_type', e.target.value)} placeholder="ex: Fruit du Démon" />
           </div>
           <div>
-            <label className={labelClass}>Arme / Style {ext.weapon_type && <span className="text-green-500">✦IA</span>}</label>
+            <label className={labelClass}>Arme / Style {ext.weapon_type && <span className="text-green-500">✦</span>}</label>
             <input className={inputClass} value={form.weapon_type} onChange={e => updateForm('weapon_type', e.target.value)} placeholder="ex: Épée" />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className={labelClass}>Statut {ext.status && <span className="text-green-500">✦</span>}</label>
+            <select className={inputClass} value={form.status} onChange={e => updateForm('status', e.target.value)}>
+              <option value="">—</option>
+              <option value="alive">Vivant</option>
+              <option value="deceased">Décédé</option>
+              <option value="unknown">Inconnu</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Espèce / Race {ext.species && <span className="text-green-500">✦</span>}</label>
+            <input className={inputClass} value={form.species} onChange={e => updateForm('species', e.target.value)} placeholder="ex: humain, démon, titan…" />
+          </div>
+          <div>
+            <label className={labelClass}>Tranche d&apos;âge {ext.age_range && <span className="text-green-500">✦</span>}</label>
+            <select className={inputClass} value={form.age_range} onChange={e => updateForm('age_range', e.target.value)}>
+              <option value="">—</option>
+              <option value="enfant">Enfant</option>
+              <option value="adolescent">Adolescent</option>
+              <option value="adulte">Adulte</option>
+              <option value="ancien">Ancien</option>
+            </select>
           </div>
         </div>
         <div>

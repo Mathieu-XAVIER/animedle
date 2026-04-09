@@ -13,9 +13,10 @@ interface Props {
   onSelect: (id: string) => void
   excludeIds?: string[]
   disabled?: boolean
+  animeSlug?: string
 }
 
-export default function CharacterSearch({ onSelect, excludeIds = [], disabled }: Props) {
+export default function CharacterSearch({ onSelect, excludeIds = [], disabled, animeSlug }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [open, setOpen] = useState(false)
@@ -26,12 +27,14 @@ export default function CharacterSearch({ onSelect, excludeIds = [], disabled }:
     if (query.length < 2) { setResults([]); setOpen(false); return }
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
-      const res = await fetch(`/api/characters/search?q=${encodeURIComponent(query)}`)
+      const params = new URLSearchParams({ q: query })
+      if (animeSlug) params.set('anime', animeSlug)
+      const res = await fetch(`/api/characters/search?${params}`)
       const data: SearchResult[] = await res.json()
       setResults(data.filter(r => !excludeIds.includes(r.id)))
       setOpen(true)
     }, 300)
-  }, [query, excludeIds])
+  }, [query, excludeIds, animeSlug])
 
   function handleSelect(result: SearchResult) {
     setQuery('')

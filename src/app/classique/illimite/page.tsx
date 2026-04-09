@@ -7,7 +7,7 @@ export default async function IllimitePage() {
   const supabase = await createClient()
 
   const [{ data: animes }, randomRes] = await Promise.all([
-    supabase.from('animes').select('id, title, short_title').eq('is_active', true),
+    supabase.from('animes').select('id, slug, title, short_title').eq('is_active', true),
     fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL ? `${process.env.NEXTAUTH_URL ?? 'http://localhost:3000'}` : 'http://localhost:3000'}/api/game/random?mode=classique`, { cache: 'no-store' }),
   ])
 

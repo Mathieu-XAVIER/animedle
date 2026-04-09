@@ -9,6 +9,9 @@ export interface GuessComparison {
   faction: CompareResult
   power_type: CompareResult
   weapon_type: CompareResult
+  status: CompareResult
+  species: CompareResult
+  age_range: CompareResult
 }
 
 type Character = Tables<'characters'>
@@ -48,11 +51,14 @@ export function compareCharacters(
   target: Character
 ): GuessComparison {
   return {
-    anime_id: compareField(guess.anime_id, target.anime_id),
-    gender: compareField(guess.gender, target.gender),
-    role_type: compareField(guess.role_type, target.role_type),
-    faction: compareField(guess.faction, target.faction, true),
+    anime_id:   compareField(guess.anime_id, target.anime_id),
+    gender:     compareField(guess.gender, target.gender),
+    role_type:  compareField(guess.role_type, target.role_type),
+    faction:    compareField(guess.faction, target.faction, true),
     power_type: compareField(guess.power_type, target.power_type, true),
     weapon_type: compareField(guess.weapon_type, target.weapon_type, true),
+    status:     compareField(guess.status, target.status),
+    species:    compareField(guess.species, target.species, true),
+    age_range:  compareField(guess.age_range, target.age_range),
   }
 }
