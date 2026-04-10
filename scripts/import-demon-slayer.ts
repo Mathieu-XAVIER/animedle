@@ -1,6 +1,6 @@
 /**
  * Import Demon Slayer depuis https://demon-slayer-api.onrender.com/v1/
- * Fournit : affiliation (faction), race/espèce, statut, genre, style de combat
+ * Insère directement dans `characters` (is_active=true) + `character_aliases`.
  * Note : hébergé sur Render free tier — peut prendre ~30s à "réveiller"
  *
  * Usage : npx tsx scripts/import-demon-slayer.ts [--no-anilist]
@@ -11,6 +11,7 @@ config({ path: '.env.local' })
 
 import { createClient } from '@supabase/supabase-js'
 import { getAniListGender } from './extract-attributes'
+import { slugify, normalizeString } from '../src/lib/utils/normalize'
 
 const ANIME_SLUG = 'demon-slayer'
 const BASE_URL = 'https://demon-slayer-api.onrender.com/v1/'
@@ -82,10 +83,6 @@ function getCombatStyle(char: DsCharacter): string | null {
   return char.combat_style ?? char['combat style'] ?? null
 }
 
-function getJapaneseVA(char: DsCharacter): string | null {
-  return char.japanese_va ?? char['japanese va'] ?? null
-}
-
 function buildDescription(char: DsCharacter): string | null {
   const parts: string[] = []
   if (char.occupation) parts.push(char.occupation)
@@ -94,11 +91,17 @@ function buildDescription(char: DsCharacter): string | null {
   return parts.join(' ') + '.'
 }
 
-/** Réveil de l'API Render : tenter plusieurs fois avec un délai */
+function extractPowerType(char: DsCharacter): string | null {
+  if (char.race?.toLowerCase().includes('demon') || char.affiliation?.toLowerCase().includes('twelve')) {
+    return char.occupation ?? null
+  }
+  return null
+}
+
 async function fetchWithWarmup(url: string, maxRetries = 3): Promise<Response> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(attempt > 1 ? `[import-ds] Tentative ${attempt}…` : '')
+      if (attempt > 1) console.log(`[import-ds] Tentative ${attempt}…`)
       const res = await fetch(url, { signal: AbortSignal.timeout(40000) })
       if (res.ok) return res
       throw new Error(`HTTP ${res.status}`)
@@ -117,6 +120,12 @@ async function main() {
   const args = process.argv.slice(2)
   const noAniList = args.includes('--no-anilist')
 
+  // Récupérer l'anime_id
+  const { data: anime, error: animeErr } = await supabase
+    .from('animes').select('id').eq('slug', ANIME_SLUG).single()
+  if (animeErr || !anime) { console.error('[import-ds] Anime introuvable :', animeErr?.message); process.exit(1) }
+  const animeId = anime.id
+
   console.log(`[import-ds] Connexion à ${BASE_URL} (peut prendre ~30s si l'API dort)…`)
 
   let characters: DsCharacter[]
@@ -130,91 +139,72 @@ async function main() {
 
   console.log(`[import-ds] ${characters.length} personnages récupérés.`)
 
-  const rows = []
+  let totalImported = 0
+  let totalSkipped = 0
   const errs: string[] = []
 
   for (let i = 0; i < characters.length; i++) {
     const char = characters[i]
 
-    // Genre : depuis l'API en priorité, puis AniList
     let gender = normalizeGender(char.gender)
     if (!gender && !noAniList) {
       await sleep(800)
       gender = await getAniListGender(char.name)
     }
 
-    const combatStyle = getCombatStyle(char)
-    const japaneseVA = getJapaneseVA(char)
-
-    const extracted = {
-      gender,
-      faction:           char.affiliation ?? null,
-      power_type:        null as string | null,
-      weapon_type:       combatStyle,
-      species:           char.race ?? null,
-      status:            normalizeStatus(char.status),
-      age_range:         normalizeAgeRange(char.age),
-      description_short: buildDescription(char),
-      voice_actor_jp:    japaneseVA,
-    }
-
-    // Pour les démons, le "pouvoir" = leur rang (Upper Rank, Lower Rank, etc.)
-    if (char.race?.toLowerCase().includes('demon') || char.affiliation?.toLowerCase().includes('twelve')) {
-      extracted.power_type = char.occupation ?? null
-    }
-
-    // Index stable : on utilise l'index dans la liste si pas d'id
-    const externalId = char.id ?? (i + 1)
-
     process.stdout.write(
-      `\r[import-ds] ${i + 1}/${characters.length} — ${char.name.padEnd(30)} | faction: ${(extracted.faction ?? '—').slice(0, 20)}   `
+      `\r[import-ds] ${i + 1}/${characters.length} — ${char.name.padEnd(30)} | faction: ${(char.affiliation ?? '—').slice(0, 20)}   `
     )
 
-    rows.push({
-      anime_slug:        ANIME_SLUG,
-      external_id:       externalId,
-      name:              char.name,
-      name_kanji:        null,
-      role_source:       'Supporting',
-      favorites:         0,
-      image_url:         null,
-      raw_json:          { entry: char, extracted, japanese_va: japaneseVA },
-      validated_at:      null,
-      validation_status: 'pending' as const,
+    const externalId = char.id ?? (i + 1)
+    const slug = `${slugify(char.name)}-${externalId}`
+
+    const { data: upserted, error: charErr } = await supabase
+      .from('characters')
+      .upsert({
+        anime_id:           animeId,
+        slug,
+        name:               char.name,
+        display_name:       char.name,
+        gender,
+        role_type:          'supporting',
+        faction:            char.affiliation ?? null,
+        power_type:         extractPowerType(char),
+        weapon_type:        getCombatStyle(char),
+        species:            char.race ?? null,
+        status:             normalizeStatus(char.status),
+        age_range:          normalizeAgeRange(char.age),
+        description_short:  buildDescription(char),
+        difficulty:         'medium',
+        popularity_rank:    null,
+        source_external_id: String(externalId),
+        quote_ready:        false,
+        silhouette_ready:   false,
+        is_active:          true,
+      }, { onConflict: 'slug' })
+      .select('id')
+      .single()
+
+    if (charErr) {
+      errs.push(`${char.name} : ${charErr.message}`)
+      totalSkipped++
+      continue
+    }
+
+    // Alias
+    await supabase.from('character_aliases').delete().eq('character_id', upserted.id)
+    await supabase.from('character_aliases').insert({
+      character_id:     upserted.id,
+      alias:            char.name,
+      normalized_alias: normalizeString(char.name),
     })
+
+    totalImported++
   }
 
   process.stdout.write('\n')
-
-  let totalImported = 0
-  let totalSkipped = 0
-
-  for (let i = 0; i < rows.length; i += 20) {
-    const batch = rows.slice(i, i + 20)
-    const { data, error } = await supabase
-      .from('staging_characters')
-      .upsert(batch, { onConflict: 'anime_slug,external_id', ignoreDuplicates: true })
-      .select('id')
-
-    if (error) {
-      console.error(`[import-ds] Erreur Supabase (lot ${i}) :`, error.message)
-      errs.push(error.message)
-    } else {
-      totalImported += data?.length ?? 0
-      totalSkipped += batch.length - (data?.length ?? 0)
-    }
-  }
-
-  console.log(`[import-ds] ✓ ${totalImported} insérés, ${totalSkipped} doublons ignorés.` +
-    (errs.length ? ` ${errs.length} erreurs.` : ''))
-
-  await supabase.from('admin_import_logs').insert({
-    anime_slug: ANIME_SLUG,
-    imported: totalImported,
-    skipped: totalSkipped,
-    errors: errs,
-    status: errs.length > 0 ? 'partial' : 'success',
-  })
+  console.log(`[import-ds] ✓ ${totalImported} insérés/mis à jour, ${totalSkipped} erreurs.` +
+    (errs.length ? `\n${errs.slice(0, 5).join('\n')}` : ''))
 }
 
 function sleep(ms: number) {

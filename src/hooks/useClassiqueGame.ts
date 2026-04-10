@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getTodayUTC } from '@/lib/utils/dates'
 import type { GuessComparison } from '@/lib/game/compare'
 
-export type GameStatus = 'idle' | 'loading' | 'playing' | 'won' | 'lost'
+export type GameStatus = 'idle' | 'loading' | 'playing' | 'won'
 
 export interface GuessEntry {
   character: {
@@ -19,6 +19,7 @@ export interface GuessEntry {
     status: string | null
     species: string | null
     age_range: string | null
+    popularity_rank: number | null
   }
   comparison: GuessComparison
 }
@@ -30,8 +31,6 @@ interface GameState {
   targetCharacter: { id: string; display_name: string; anime_id: string } | null
   error: string | null
 }
-
-const MAX_ATTEMPTS = 6
 
 function getStorageKey(isIllimite: boolean, challengeId?: string | null, animeSlug?: string) {
   if (isIllimite) return `illimite_${challengeId ?? 'new'}`
@@ -67,7 +66,6 @@ export function useClassiqueGame(sessionId: string, targetCharacterId?: string, 
 
   useEffect(() => {
     if (isIllimite) {
-      // Mode illimité : challengeId = `random-{targetId}`
       const challengeId = `random-${targetCharacterId}`
       const saved = loadFromStorage(getStorageKey(true, challengeId))
       if (saved?.status && saved.status !== 'idle') {
@@ -123,9 +121,7 @@ export function useClassiqueGame(sessionId: string, targetCharacterId?: string, 
 
     setState(prev => {
       const attempts = [...prev.attempts, newEntry]
-      let status: GameStatus = 'playing'
-      if (data.isCorrect) status = 'won'
-      else if (!isIllimite && data.attemptsCount >= MAX_ATTEMPTS) status = 'lost'
+      const status: GameStatus = data.isCorrect ? 'won' : 'playing'
 
       const next: GameState = {
         ...prev,

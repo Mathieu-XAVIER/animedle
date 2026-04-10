@@ -51,37 +51,44 @@ export default function CharacterSearch({ onSelect, excludeIds = [], disabled, a
         value={query}
         onChange={e => setQuery(e.target.value)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="Rechercher un personnage..."
+        placeholder="Rechercher un personnage…"
         disabled={disabled}
-        className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-colors duration-200 disabled:opacity-40"
+        className="w-full px-4 py-3 rounded-xl border focus:outline-none transition-colors duration-200 disabled:opacity-40 text-sm"
         style={{
-          background: 'var(--card)',
-          borderColor: 'var(--border)',
-          color: 'var(--text)',
-          fontFamily: 'var(--font-barlow)',
+          background:   'var(--card)',
+          borderColor:  'var(--border)',
+          color:        'var(--text)',
+          fontFamily:   'var(--font-barlow)',
+          boxShadow:    '0 1px 3px rgba(0,0,0,0.06)',
         }}
         onFocus={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
         onBlurCapture={e => (e.currentTarget.style.borderColor = 'var(--border)')}
       />
       <style>{`input::placeholder { color: var(--muted); }`}</style>
       {open && results.length > 0 && (
-        <ul className="absolute z-10 w-full mt-1 rounded-xl overflow-hidden shadow-2xl border"
-          style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <ul
+          className="absolute z-10 w-full mt-1 rounded-xl overflow-hidden border"
+          style={{
+            background:  'var(--card)',
+            borderColor: 'var(--border)',
+            boxShadow:   '0 8px 24px rgba(0,0,0,0.10)',
+          }}
+        >
           {results.map(r => (
             <li
               key={r.id}
               onMouseDown={() => handleSelect(r)}
               className="flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors duration-150"
               style={{ borderBottom: '1px solid var(--border)' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-hover)')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{r.display_name}</span>
               {r.short_title && (
                 <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                  color: 'var(--accent)',
-                  background: 'var(--accent-dim)',
-                  fontFamily: 'var(--font-chakra)',
+                  color:       'var(--accent)',
+                  background:  'var(--accent-dim)',
+                  fontFamily:  'var(--font-chakra)',
                   letterSpacing: '0.04em',
                 }}>
                   {r.short_title}

@@ -15,16 +15,14 @@ interface Props {
   animes: Anime[]
   isIllimite?: boolean
   targetCharacterId?: string
+  preSelectedAnime?: string
 }
 
-const MAX_ATTEMPTS = 6
-
-export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCharacterId }: Props) {
+export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCharacterId, preSelectedAnime }: Props) {
   const router = useRouter()
 
-  // Sélection d'anime (mode daily uniquement — illimité cible un personnage précis)
   const [selectedAnimeSlug, setSelectedAnimeSlug] = useState<string | null>(
-    isIllimite ? null : null
+    isIllimite ? null : (preSelectedAnime ?? null)
   )
 
   const { state, submitGuess, loadDaily } = useClassiqueGame(
@@ -40,6 +38,9 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
 
   const isActive = state.status === 'playing'
   const excludedIds = state.attempts.map(a => a.character.id)
+  const currentAnimeName = selectedAnimeSlug
+    ? (animes.find(a => a.slug === selectedAnimeSlug)?.short_title ?? animes.find(a => a.slug === selectedAnimeSlug)?.title ?? selectedAnimeSlug)
+    : null
 
   const handleReplay = useCallback(() => {
     router.refresh()
@@ -50,33 +51,28 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
 
       {/* Header */}
       <header className="border-b px-4 py-3 flex items-center justify-between shrink-0"
-        style={{ borderColor: 'var(--border)', background: 'rgba(3,3,8,0.9)', backdropFilter: 'blur(12px)' }}>
-        <Link href="/" className="text-lg font-bold tracking-[0.16em]" style={{ fontFamily: 'var(--font-chakra)' }}>
-          <span style={{ color: 'var(--accent)' }}>ANIME</span>
-          <span style={{ color: 'var(--text)' }}>DLE</span>
-        </Link>
+        style={{ borderColor: 'var(--border)', background: 'rgba(245,244,240,0.92)', backdropFilter: 'blur(12px)' }}>
+        <div className="flex items-center gap-3">
+          <Link href="/" className="text-base font-bold tracking-[0.16em]" style={{ fontFamily: 'var(--font-chakra)' }}>
+            <span style={{ color: 'var(--accent)' }}>ANIME</span>
+            <span style={{ color: 'var(--text)' }}>DLE</span>
+          </Link>
+          {currentAnimeName && (
+            <>
+              <span style={{ color: 'var(--subtle)' }}>/</span>
+              <span className="text-xs font-semibold" style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
+                {currentAnimeName}
+              </span>
+            </>
+          )}
+        </div>
 
         <div className="flex items-center gap-3">
           <span className="text-xs tracking-widest uppercase" style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
-            {isIllimite ? '∞ ILLIMITÉ' : selectedAnimeSlug
-              ? `⚔ ${animes.find(a => a.slug === selectedAnimeSlug)?.short_title ?? selectedAnimeSlug.toUpperCase()}`
-              : '⚔ CLASSIQUE'}
+            {isIllimite ? '∞ ILLIMITÉ' : '⚔ CLASSIQUE'}
           </span>
-          {/* Dots de tentatives (mode daily uniquement) */}
-          {!isIllimite && (
-            <div className="flex gap-1">
-              {Array.from({ length: MAX_ATTEMPTS }).map((_, i) => (
-                <div key={i} className="w-1.5 h-1.5 rounded-full transition-all duration-300" style={{
-                  background: i < state.attempts.length
-                    ? (state.status === 'won' && i === state.attempts.length - 1 ? '#22c55e' : 'var(--accent)')
-                    : 'var(--subtle)',
-                }} />
-              ))}
-            </div>
-          )}
-          {/* Compteur d'essais (mode illimité) */}
-          {isIllimite && state.attempts.length > 0 && (
-            <span className="text-xs tabular-nums" style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
+          {state.attempts.length > 0 && (
+            <span className="text-xs tabular-nums font-semibold" style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
               {state.attempts.length} essai{state.attempts.length > 1 ? 's' : ''}
             </span>
           )}
@@ -84,14 +80,14 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
       </header>
 
       {/* Content */}
-      <div className="flex-1 max-w-xl mx-auto w-full px-4 py-6 space-y-5">
+      <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-6 space-y-5">
 
-        {/* Sélecteur d'anime (mode daily uniquement, avant de commencer) */}
+        {/* Sélecteur d'anime */}
         {!isIllimite && !selectedAnimeSlug && state.status === 'idle' && (
           <div className="py-8 space-y-6">
             <div className="text-center">
               <h1 className="text-sm uppercase tracking-widest font-semibold mb-1"
-                style={{ fontFamily: 'var(--font-chakra)', color: 'var(--muted)' }}>
+                style={{ fontFamily: 'var(--font-chakra)', color: 'var(--text)' }}>
                 Choisis un univers
               </h1>
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
@@ -106,11 +102,8 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
                     setSelectedAnimeSlug(anime.slug)
                     loadDaily()
                   }}
-                  className="w-full py-4 px-5 rounded-xl border text-left transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
-                  style={{
-                    background: 'var(--card)',
-                    borderColor: 'var(--border)',
-                  }}
+                  className="w-full py-4 px-5 rounded-xl border text-left transition-all duration-200 hover:shadow-sm active:scale-[0.98]"
+                  style={{ background: 'var(--card)', borderColor: 'var(--border)' }}
                 >
                   <span className="font-bold text-sm" style={{ fontFamily: 'var(--font-chakra)', color: 'var(--text)' }}>
                     {anime.title}
@@ -130,35 +123,46 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
         {/* Loading */}
         {state.status === 'loading' && (
           <div className="py-20 text-center space-y-3">
-            <div className="text-3xl font-bold anim-glow" style={{ fontFamily: 'var(--font-chakra)', color: 'var(--accent)' }}>
-              LOADING
+            <div className="text-2xl font-bold" style={{ fontFamily: 'var(--font-chakra)', color: 'var(--accent)' }}>
+              Chargement…
             </div>
-            <p className="text-sm" style={{ color: 'var(--muted)' }}>Connexion au serveur anime...</p>
           </div>
         )}
 
         {/* Error */}
         {state.error && (
           <div className="rounded-xl border p-4 text-sm" style={{
-            borderColor: 'rgba(220,38,38,0.4)', background: 'rgba(220,38,38,0.08)', color: '#fca5a5'
+            borderColor: 'rgba(220,38,38,0.3)', background: 'rgba(220,38,38,0.06)', color: '#b91c1c'
           }}>
             {state.error}
           </div>
         )}
 
         {/* Game UI */}
-        {(isActive || state.status === 'won' || state.status === 'lost') && (
+        {(isActive || state.status === 'won') && (
           <>
-            {/* Title */}
-            <div className="flex items-center justify-between">
+            {/* Titre + légende */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h1 className="text-xs uppercase tracking-widest font-semibold" style={{ fontFamily: 'var(--font-chakra)', color: 'var(--muted)' }}>
                 Devine le personnage
               </h1>
-              {!isIllimite && (
-                <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                  {MAX_ATTEMPTS - state.attempts.length} essai{MAX_ATTEMPTS - state.attempts.length > 1 ? 's' : ''} restant{MAX_ATTEMPTS - state.attempts.length > 1 ? 's' : ''}
+              {/* Légende */}
+              <div className="flex gap-3 text-[10px] font-semibold flex-wrap" style={{ color: 'var(--muted)' }}>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded inline-block" style={{ background: 'rgb(61,167,94)' }} />
+                  Exact
                 </span>
-              )}
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded inline-block" style={{ background: 'rgba(217,200,39,0.9)' }} />
+                  Proche
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-3 h-3 rounded inline-block" style={{ background: 'rgb(213,54,51)' }} />
+                  Incorrect
+                </span>
+                <span className="flex items-center gap-1 text-red-500 font-bold">↑ Supérieur</span>
+                <span className="flex items-center gap-1 text-red-500 font-bold">↓ Inférieur</span>
+              </div>
             </div>
 
             {/* Search */}
@@ -169,28 +173,10 @@ export default function ClassiqueGame({ sessionId, animes, isIllimite, targetCha
               animeSlug={selectedAnimeSlug ?? undefined}
             />
 
-            {/* Legend */}
-            <div className="flex gap-4 text-xs" style={{ color: 'var(--muted)' }}>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded" style={{ background: 'var(--correct)' }} /> Exact
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded" style={{ background: 'var(--partial)' }} /> Proche
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded" style={{ background: 'var(--wrong)' }} /> Faux
-              </span>
-            </div>
-
-            {/* Guess grid */}
-            <div className="space-y-3">
+            {/* Grille des tentatives */}
+            <div className="space-y-3 overflow-x-auto pb-2">
               {state.attempts.map((entry, i) => (
-                <GuessRow key={i} entry={entry} animeMap={animeMap} index={i} />
-              ))}
-              {/* Placeholder rows (mode daily uniquement) */}
-              {!isIllimite && Array.from({ length: Math.max(0, MAX_ATTEMPTS - state.attempts.length) }).map((_, i) => (
-                <div key={`ph-${i}`} className="h-16 rounded-xl border-2 border-dashed"
-                  style={{ borderColor: 'var(--border)', opacity: Math.max(0.15, 0.45 - i * 0.07) }} />
+                <GuessRow key={i} entry={entry} index={i} />
               ))}
             </div>
           </>

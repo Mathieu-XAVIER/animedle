@@ -15,17 +15,19 @@ interface Props {
 
 const EMOJI: Record<CompareResult, string> = {
   correct: '🟩',
-  partial:  '🟨',
-  wrong:    '⬛',
+  partial: '🟨',
+  wrong:   '🟥',
+  higher:  '⬆️',
+  lower:   '⬇️',
 }
 
-const ATTRS = ['anime_id', 'gender', 'role_type', 'faction', 'power_type', 'weapon_type'] as const
+const ATTRS = ['gender', 'faction', 'power_type', 'species', 'status', 'role_type', 'age_range', 'popularity_rank'] as const
 
 export default function ResultModal({ status, attempts, targetCharacter, animeMap, onReplay, mode = 'Classique', isIllimite }: Props) {
-  if (status !== 'won' && status !== 'lost') return null
+  if (status !== 'won') return null
 
   function buildShareText() {
-    const header = `Animedle — Mode ${mode} (${attempts.length}${isIllimite ? '' : '/6'})`
+    const header = `Animedle — Mode ${mode} (${attempts.length} essai${attempts.length > 1 ? 's' : ''})`
     const grid = attempts.map(a =>
       ATTRS.map(attr => EMOJI[a.comparison[attr]]).join('')
     ).join('\n')
@@ -42,19 +44,21 @@ export default function ResultModal({ status, attempts, targetCharacter, animeMa
     }
   }
 
-  const won = status === 'won'
-
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
-      style={{ background: 'rgba(0,0,8,0.75)', backdropFilter: 'blur(6px)' }}>
+      style={{ background: 'rgba(17,17,24,0.45)', backdropFilter: 'blur(6px)' }}>
       <div className="rounded-2xl p-6 max-w-sm w-full space-y-4 anim-slide-in"
-        style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+        style={{
+          background: 'var(--card)',
+          border:     '1px solid var(--border)',
+          boxShadow:  '0 20px 60px rgba(0,0,0,0.18)',
+        }}>
 
         {/* En-tête */}
         <div className="text-center space-y-2">
-          <div className="text-5xl">{won ? '🎉' : '😔'}</div>
+          <div className="text-5xl">🎉</div>
           <h2 className="text-xl font-bold" style={{ fontFamily: 'var(--font-chakra)', color: 'var(--text)' }}>
-            {won ? 'Bravo !' : 'Perdu !'}
+            Bravo !
           </h2>
           {targetCharacter && (
             <p className="text-sm" style={{ color: 'var(--muted)' }}>
@@ -66,20 +70,18 @@ export default function ResultModal({ status, attempts, targetCharacter, animeMa
             </p>
           )}
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            {won
-              ? `${attempts.length} essai${attempts.length > 1 ? 's' : ''}`
-              : 'Meilleure chance demain !'}
+            {attempts.length} essai{attempts.length > 1 ? 's' : ''}
           </p>
         </div>
 
         {/* Grille emoji */}
-        <div className="font-mono text-lg text-center leading-snug py-1">
+        <div className="font-mono text-lg text-center leading-snug py-1 rounded-xl border p-3"
+          style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
           {attempts.map((a, i) => (
             <div key={i}>{ATTRS.map(attr => EMOJI[a.comparison[attr]]).join('')}</div>
           ))}
         </div>
 
-        {/* Séparateur */}
         <div className="h-px" style={{ background: 'var(--border)' }} />
 
         {/* Actions */}

@@ -1,7 +1,6 @@
 /**
  * Import One Piece depuis https://api.api-onepiece.com/v2/characters/en
- * Fournit : crew (faction), devil fruit (pouvoir), bounty, job, statut
- * Genre : récupéré via AniList (pas disponible dans cette API)
+ * Insère directement dans `characters` (is_active=true) + `character_aliases`.
  *
  * Usage : npx tsx scripts/import-one-piece.ts [--no-anilist] [--limit N]
  */
@@ -11,6 +10,7 @@ config({ path: '.env.local' })
 
 import { createClient } from '@supabase/supabase-js'
 import { getAniListGender } from './extract-attributes'
+import { slugify, normalizeString } from '@/lib/utils/normalize'
 
 const ANIME_SLUG = 'one-piece'
 const BASE_URL = 'https://api.api-onepiece.com/v2/characters/en'
@@ -64,7 +64,6 @@ function normalizeStatus(status: string | null): 'alive' | 'deceased' | 'unknown
 
 function normalizeAgeRange(ageStr: string | null): 'enfant' | 'adolescent' | 'adulte' | 'ancien' | null {
   if (!ageStr) return null
-  // "19 ans" → 19 ou "19" → 19
   const match = ageStr.match(/(\d+)/)
   if (!match) return null
   const n = parseInt(match[1], 10)
@@ -83,11 +82,9 @@ function buildDescription(char: OpCharacter): string | null {
   return parts.join(' ') + '.'
 }
 
-/** Rôle : personnages principaux hardcodés (équipage Chapeau de Paille) */
 const MAIN_CREW_ID = 1 // Straw Hat Pirates
-function deriveRoleSource(char: OpCharacter): string {
-  if (char.crew?.id === MAIN_CREW_ID) return 'Main'
-  return 'Supporting'
+function deriveRoleType(char: OpCharacter): 'main' | 'supporting' {
+  return char.crew?.id === MAIN_CREW_ID ? 'main' : 'supporting'
 }
 
 // ─── Import ───────────────────────────────────────────────────────────────────
@@ -106,6 +103,12 @@ async function main() {
     ? parseInt(args[limitFlag + 1], 10)
     : DEFAULT_LIMIT
 
+  // Récupérer l'anime_id
+  const { data: anime, error: animeErr } = await supabase
+    .from('animes').select('id').eq('slug', ANIME_SLUG).single()
+  if (animeErr || !anime) { console.error('[import-op] Anime introuvable :', animeErr?.message); process.exit(1) }
+  const animeId = anime.id
+
   console.log(`[import-op] Récupération des personnages depuis ${BASE_URL}…`)
 
   let allChars: OpCharacter[]
@@ -118,7 +121,6 @@ async function main() {
 
   console.log(`[import-op] ${allChars.length} personnages disponibles, traitement des ${limit} premiers.`)
 
-  // Trier par bounty (popularité approximative) puis par id
   const sorted = [...allChars].sort((a, b) => {
     const bA = parseInt((a.bounty ?? '0').replace(/\D/g, ''), 10) || 0
     const bB = parseInt((b.bounty ?? '0').replace(/\D/g, ''), 10) || 0
@@ -126,79 +128,71 @@ async function main() {
   })
 
   const top = sorted.slice(0, limit)
-  const rows = []
+  let totalImported = 0
+  let totalSkipped = 0
   const errs: string[] = []
 
   for (let i = 0; i < top.length; i++) {
     const char = top[i]
 
-    // Genre via AniList (l'API OP ne le fournit pas)
     let gender: 'Male' | 'Female' | 'Unknown' | null = null
     if (!noAniList) {
-      await sleep(800) // rate limit AniList
+      await sleep(800)
       gender = await getAniListGender(char.name)
     }
 
-    const extracted = {
-      gender,
-      faction:           char.crew?.name ?? null,
-      power_type:        char.fruit?.name ?? null,
-      weapon_type:       null as string | null,
-      species:           'humain',
-      status:            normalizeStatus(char.status),
-      age_range:         normalizeAgeRange(char.age),
-      description_short: buildDescription(char),
-    }
-
     process.stdout.write(
-      `\r[import-op] ${i + 1}/${top.length} — ${char.name.padEnd(30)} | faction: ${(extracted.faction ?? '—').slice(0, 20)}   `
+      `\r[import-op] ${i + 1}/${top.length} — ${char.name.padEnd(30)} | faction: ${(char.crew?.name ?? '—').slice(0, 20)}   `
     )
 
-    rows.push({
-      anime_slug:        ANIME_SLUG,
-      external_id:       char.id,
-      name:              char.name,
-      name_kanji:        null,
-      role_source:       deriveRoleSource(char),
-      favorites:         Math.min(parseInt((char.bounty ?? '0').replace(/\D/g, ''), 10) || 0, 2_000_000_000),
-      image_url:         null, // L'API OP ne fournit pas d'images
-      raw_json:          { entry: char, extracted },
-      validated_at:      null,
-      validation_status: 'pending' as const,
+    const slug = `${slugify(char.name)}-${char.id}`
+
+    const { data: upserted, error: charErr } = await supabase
+      .from('characters')
+      .upsert({
+        anime_id:           animeId,
+        slug,
+        name:               char.name,
+        display_name:       char.name,
+        gender,
+        role_type:          deriveRoleType(char),
+        faction:            char.crew?.name ?? null,
+        power_type:         char.fruit?.name ?? null,
+        weapon_type:        null,
+        species:            'humain',
+        status:             normalizeStatus(char.status),
+        age_range:          normalizeAgeRange(char.age),
+        description_short:  buildDescription(char),
+        difficulty:         'medium',
+        popularity_rank:    Math.min(parseInt((char.bounty ?? '0').replace(/\D/g, ''), 10) || 0, 2_000_000_000),
+        source_external_id: String(char.id),
+        quote_ready:        false,
+        silhouette_ready:   false,
+        is_active:          true,
+      }, { onConflict: 'slug' })
+      .select('id')
+      .single()
+
+    if (charErr) {
+      errs.push(`${char.name} : ${charErr.message}`)
+      totalSkipped++
+      continue
+    }
+
+    // Alias — supprimer les anciens pour éviter les doublons
+    await supabase.from('character_aliases').delete().eq('character_id', upserted.id)
+    await supabase.from('character_aliases').insert({
+      character_id:     upserted.id,
+      alias:            char.name,
+      normalized_alias: normalizeString(char.name),
     })
+
+    totalImported++
   }
 
   process.stdout.write('\n')
-
-  let totalImported = 0
-  let totalSkipped = 0
-
-  for (let i = 0; i < rows.length; i += 20) {
-    const batch = rows.slice(i, i + 20)
-    const { data, error } = await supabase
-      .from('staging_characters')
-      .upsert(batch, { onConflict: 'anime_slug,external_id', ignoreDuplicates: true })
-      .select('id')
-
-    if (error) {
-      console.error(`[import-op] Erreur Supabase (lot ${i}) :`, error.message)
-      errs.push(error.message)
-    } else {
-      totalImported += data?.length ?? 0
-      totalSkipped += batch.length - (data?.length ?? 0)
-    }
-  }
-
-  console.log(`[import-op] ✓ ${totalImported} insérés, ${totalSkipped} doublons ignorés.` +
-    (errs.length ? ` ${errs.length} erreurs.` : ''))
-
-  await supabase.from('admin_import_logs').insert({
-    anime_slug: ANIME_SLUG,
-    imported: totalImported,
-    skipped: totalSkipped,
-    errors: errs,
-    status: errs.length > 0 ? 'partial' : 'success',
-  })
+  console.log(`[import-op] ✓ ${totalImported} insérés/mis à jour, ${totalSkipped} erreurs.` +
+    (errs.length ? `\n${errs.slice(0, 5).join('\n')}` : ''))
 }
 
 function sleep(ms: number) {

@@ -3,7 +3,12 @@ import { cookies } from 'next/headers'
 import { randomUUID } from 'crypto'
 import ClassiqueGame from './ClassiqueGame'
 
-export default async function ClassiquePage() {
+export default async function ClassiquePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ anime?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
   const { data: animes } = await supabase.from('animes').select('id, slug, title, short_title').eq('is_active', true)
 
@@ -11,5 +16,11 @@ export default async function ClassiquePage() {
   let sessionId = cookieStore.get('session_id')?.value
   if (!sessionId) sessionId = randomUUID()
 
-  return <ClassiqueGame sessionId={sessionId} animes={animes ?? []} />
+  return (
+    <ClassiqueGame
+      sessionId={sessionId}
+      animes={animes ?? []}
+      preSelectedAnime={params.anime}
+    />
+  )
 }

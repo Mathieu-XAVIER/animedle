@@ -7,8 +7,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Next.js 16** (App Router) + **React 19** + **TypeScript** — breaking changes vs older versions, read `node_modules/next/dist/docs/` before assuming API shapes
 - **Tailwind CSS v4** — CSS entry point is `@import "tailwindcss"`, config lives in `@theme` blocks inside `globals.css`, no `tailwind.config.ts`
 - **Supabase** (`@supabase/ssr` + `@supabase/supabase-js`) — PostgreSQL + auth
-- **Jikan API v4** (import-only, never called at game runtime)
-
 ## Commands
 
 ```bash
@@ -17,9 +15,10 @@ npm run build      # production build + type check
 npm run lint       # ESLint
 npx tsc --noEmit   # type-check only
 
-# Import Jikan data into staging_characters
-npx tsx scripts/import-jikan.ts --anime one-piece
-npx tsx scripts/import-jikan.ts --all
+# Import des personnages (scripts par anime)
+npx tsx scripts/import-one-piece.ts [--no-anilist] [--limit N]
+npx tsx scripts/import-snk.ts [--no-anilist]
+npx tsx scripts/import-demon-slayer.ts [--no-anilist]
 ```
 
 ## Environment variables (`.env.local`)
@@ -36,11 +35,9 @@ ADMIN_SECRET_TOKEN=        # protège /admin et /api/admin/*
 ### Data flow
 
 ```
-Jikan API → scripts/import-jikan.ts → staging_characters (pending)
-                                            ↓ (admin validation)
-                                       characters (is_active=true)
-                                            ↓
-                               daily_challenges + game_sessions
+scripts/import-*.ts → characters (is_active=true) + character_aliases
+                            ↓
+               daily_challenges + game_sessions
 ```
 
 ### Supabase clients
@@ -61,10 +58,7 @@ Cookie HTTP-only `admin_token` comparé à `ADMIN_SECRET_TOKEN` dans `src/middle
 
 ### Back-office
 
-- `/admin/staging` — liste paginable des personnages Jikan importés, action bulk publish
-- `/admin/staging/[id]` — `CharacterForm` (Client Component) : édition complète + promotion vers `characters` via `POST /api/admin/characters`
 - `/admin/defis` — `DefiForm` (Client Component) : planification sur 14 jours par mode (`classique`, `citation`)
-- Bulk publish (`POST /api/admin/characters/bulk`) : crée les personnages avec slug `{slugify(name)}-{external_id}` pour éviter les doublons
 
 ### Client hooks
 

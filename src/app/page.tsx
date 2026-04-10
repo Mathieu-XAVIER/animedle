@@ -1,69 +1,47 @@
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
 
-const MODES = [
-  {
-    id: 'classique',
-    label: 'Mode Classique',
-    tag: '⚔',
-    description: 'Devine le personnage en 6 essais. Chaque tentative révèle des attributs par code couleur.',
-    href: '/classique',
-    illimite: '/classique/illimite',
-    color: '#6366f1',
-  },
-  {
-    id: 'citation',
-    label: 'Mode Citation',
-    tag: '❝',
-    description: 'Une phrase, quatre choix. Retrouve quel personnage a prononcé ces mots.',
-    href: '/citation',
-    illimite: null,
-    color: '#8b5cf6',
-  },
-]
+const ANIME_COLORS: Record<string, string> = {
+  'one-piece':          '#2563eb',
+  'jujutsu-kaisen':    '#7c3aed',
+  'demon-slayer':      '#dc2626',
+  'shingeki-no-kyojin': '#374151',
+  'my-hero-academia':  '#d97706',
+}
 
-const ANIMES = [
-  'One Piece',
-  'Jujutsu Kaisen',
-  'Demon Slayer',
-  'Shingeki no Kyojin',
-  'My Hero Academia',
-]
+function accentFor(slug: string): string {
+  return ANIME_COLORS[slug] ?? '#4338ca'
+}
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient()
+  const { data: animes } = await supabase
+    .from('animes')
+    .select('id, slug, title, short_title')
+    .eq('is_active', true)
+    .order('title')
+
+  const list = animes ?? []
+
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden" style={{ background: 'var(--bg)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)' }}>
 
-      {/* Ambient orbs */}
-      <div className="absolute pointer-events-none anim-float" style={{
-        width: 500, height: 500, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)',
-        top: -180, left: -120,
-      }} />
-      <div className="absolute pointer-events-none" style={{
-        width: 400, height: 400, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)',
-        bottom: -100, right: -80,
-        animation: 'orbitFloat 16s ease-in-out infinite reverse',
-      }} />
-
-      {/* Background grid */}
-      <div className="absolute inset-0 pointer-events-none" style={{
+      {/* Fond subtil — lignes de grille légères */}
+      <div className="fixed inset-0 pointer-events-none" style={{
         backgroundImage: 'linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)',
-        backgroundSize: '48px 48px',
-        opacity: 0.35,
+        backgroundSize: '56px 56px',
+        opacity: 0.5,
       }} />
 
       {/* Header */}
-      <header
-        className="relative z-10 flex items-center justify-between px-6 py-4 border-b"
-        style={{ borderColor: 'var(--border)', background: 'rgba(3,3,8,0.85)', backdropFilter: 'blur(12px)' }}
-      >
-        <div className="text-xl font-bold tracking-[0.18em] anim-glow" style={{ fontFamily: 'var(--font-chakra)' }}>
+      <header className="relative z-10 flex items-center justify-between px-6 py-4 border-b"
+        style={{ borderColor: 'var(--border)', background: 'rgba(245,244,240,0.88)', backdropFilter: 'blur(12px)' }}>
+        <div className="text-xl font-bold tracking-[0.18em]" style={{ fontFamily: 'var(--font-chakra)' }}>
           <span style={{ color: 'var(--accent)' }}>ANIME</span>
           <span style={{ color: 'var(--text)' }}>DLE</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full anim-blink" style={{ background: '#22c55e' }} />
+          <span className="w-1.5 h-1.5 rounded-full anim-blink" style={{ background: '#16a34a' }} />
           <span className="text-xs tracking-widest uppercase" style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
             EN LIGNE
           </span>
@@ -71,89 +49,140 @@ export default function HomePage() {
       </header>
 
       {/* Main */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-12 text-center">
+      <main className="relative z-10 flex-1 max-w-lg mx-auto w-full px-4 py-10 space-y-8">
 
-        {/* Logo */}
-        <div className="mb-3 anim-fade-up" style={{ animationDelay: '0s' }}>
-          <div className="text-6xl font-bold anim-glow" style={{ fontFamily: 'var(--font-chakra)', letterSpacing: '0.12em' }}>
+        {/* Hero */}
+        <div className="text-center anim-fade-up" style={{ animationDelay: '0s' }}>
+          <div className="text-5xl font-bold tracking-[0.10em] mb-2" style={{ fontFamily: 'var(--font-chakra)' }}>
             <span style={{ color: 'var(--accent)' }}>ANIME</span>
             <span style={{ color: 'var(--text)' }}>DLE</span>
           </div>
-          <div className="mt-2 mx-auto h-px w-40" style={{
+          <div className="mx-auto h-[2px] w-32 mb-3" style={{
             background: 'linear-gradient(90deg, transparent, var(--accent), transparent)'
           }} />
+          <p className="text-xs tracking-[0.22em] uppercase" style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
+            Le défi anime quotidien
+          </p>
         </div>
 
-        <p className="text-sm tracking-[0.22em] uppercase mb-8 anim-fade-up"
-          style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)', animationDelay: '0.1s' }}>
-          Le défi anime quotidien
-        </p>
+        {/* Titre section */}
+        <div className="anim-fade-up" style={{ animationDelay: '0.1s' }}>
+          <p className="text-[11px] uppercase tracking-[0.18em] font-semibold mb-4"
+            style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
+            Choisis ton univers
+          </p>
 
-        {/* Mode cards */}
-        <div className="w-full max-w-md space-y-3 mb-10">
-          {MODES.map((mode, i) => (
-            <div key={mode.id} className="anim-fade-up" style={{ animationDelay: `${0.2 + i * 0.1}s` }}>
-              <div className="relative overflow-hidden rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                {/* Top accent bar */}
-                <div className="h-[2px]" style={{ background: `linear-gradient(90deg, ${mode.color}, transparent)` }} />
-                {/* Decorative tag */}
-                <div className="absolute right-5 top-4 text-5xl font-bold opacity-[0.04] select-none pointer-events-none"
-                  style={{ fontFamily: 'var(--font-chakra)', color: mode.color, lineHeight: 1 }}>
-                  {mode.tag}
-                </div>
+          {list.length === 0 ? (
+            <div className="rounded-2xl border p-8 text-center" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>Aucun anime disponible pour le moment.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {list.map((anime, i) => {
+                const color = accentFor(anime.slug)
+                return (
+                  <div
+                    key={anime.id}
+                    className="relative rounded-2xl border overflow-hidden anim-fade-up"
+                    style={{
+                      background: 'var(--card)',
+                      borderColor: 'var(--border)',
+                      animationDelay: `${0.15 + i * 0.07}s`,
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    {/* Barre de couleur latérale */}
+                    <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl" style={{ background: color }} />
 
-                <div className="p-5">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0"
-                      style={{ background: `${mode.color}18`, border: `1px solid ${mode.color}28` }}>
-                      {mode.tag}
+                    <div className="pl-5 pr-4 py-4">
+                      {/* Nom de l'anime */}
+                      <div className="flex items-baseline gap-2 mb-3">
+                        <h2 className="font-bold text-base" style={{ fontFamily: 'var(--font-chakra)', color: 'var(--text)' }}>
+                          {anime.title}
+                        </h2>
+                        {anime.short_title && (
+                          <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded"
+                            style={{ color, background: `${color}14`, fontFamily: 'var(--font-chakra)' }}>
+                            {anime.short_title}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Boutons de mode */}
+                      <div className="flex gap-2 flex-wrap">
+                        <Link
+                          href={`/classique?anime=${anime.slug}`}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 hover:opacity-85 active:scale-[0.97]"
+                          style={{
+                            background: color,
+                            color: 'white',
+                            fontFamily: 'var(--font-chakra)',
+                            letterSpacing: '0.06em',
+                          }}
+                        >
+                          <span>⚔</span> CLASSIQUE
+                        </Link>
+                        <Link
+                          href="/classique/illimite"
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 hover:opacity-80"
+                          style={{
+                            borderColor: 'var(--border)',
+                            color: 'var(--muted)',
+                            fontFamily: 'var(--font-chakra)',
+                            letterSpacing: '0.05em',
+                          }}
+                        >
+                          ∞ ILLIMITÉ
+                        </Link>
+                        <Link
+                          href="/citation"
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 hover:opacity-80"
+                          style={{
+                            borderColor: 'var(--border)',
+                            color: 'var(--muted)',
+                            fontFamily: 'var(--font-chakra)',
+                            letterSpacing: '0.05em',
+                          }}
+                        >
+                          ❝ CITATION
+                        </Link>
+                      </div>
                     </div>
-                    <h2 className="font-bold text-white text-base" style={{ fontFamily: 'var(--font-chakra)' }}>
-                      {mode.label}
-                    </h2>
                   </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
-                  <p className="text-sm mb-4 leading-relaxed text-left" style={{ color: 'var(--muted)' }}>
-                    {mode.description}
-                  </p>
-
-                  <div className="flex gap-2">
-                    <Link
-                      href={mode.href}
-                      className="flex-1 py-2.5 rounded-xl text-sm font-bold text-center transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
-                      style={{ background: mode.color, color: 'white', fontFamily: 'var(--font-chakra)', letterSpacing: '0.06em' }}
-                    >
-                      JOUER
-                    </Link>
-                    {mode.illimite && (
-                      <Link
-                        href={mode.illimite}
-                        className="px-4 py-2.5 rounded-xl text-xs transition-all duration-200 border hover:opacity-80"
-                        style={{ borderColor: 'var(--border)', color: 'var(--muted)', fontFamily: 'var(--font-chakra)', letterSpacing: '0.06em' }}
-                      >
-                        ILLIMITÉ
-                      </Link>
-                    )}
-                  </div>
-                </div>
+        {/* Description rapide des modes */}
+        <div className="anim-fade-up" style={{ animationDelay: `${0.2 + list.length * 0.07}s` }}>
+          <div className="rounded-2xl border p-4 space-y-2.5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+            <p className="text-[11px] uppercase tracking-[0.16em] font-semibold mb-3"
+              style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
+              Modes de jeu
+            </p>
+            <div className="flex items-start gap-3">
+              <span className="text-base shrink-0 mt-0.5">⚔</span>
+              <div>
+                <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>Classique</p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>Devine le personnage en 6 essais. Les attributs se révèlent par code couleur.</p>
               </div>
             </div>
-          ))}
-        </div>
-
-        {/* Animes */}
-        <div className="anim-fade-up" style={{ animationDelay: '0.45s' }}>
-          <p className="text-xs uppercase tracking-[0.2em] mb-3"
-            style={{ color: 'var(--muted)', fontFamily: 'var(--font-chakra)' }}>
-            Univers disponibles
-          </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {ANIMES.map(name => (
-              <span key={name} className="px-3 py-1.5 rounded-full text-xs border"
-                style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--muted)', fontFamily: 'var(--font-chakra)', letterSpacing: '0.04em' }}>
-                {name}
-              </span>
-            ))}
+            <div className="flex items-start gap-3">
+              <span className="text-base shrink-0 mt-0.5">❝</span>
+              <div>
+                <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>Citation</p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>Retrouve quel personnage a prononcé cette réplique parmi 4 choix.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-base shrink-0 mt-0.5">∞</span>
+              <div>
+                <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>Illimité</p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>Pas de limite d&apos;essais ni de reset quotidien — joue autant que tu veux.</p>
+              </div>
+            </div>
           </div>
         </div>
       </main>

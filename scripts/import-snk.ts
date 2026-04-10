@@ -1,6 +1,6 @@
 /**
  * Import Attack on Titan depuis https://api.attackontitanapi.com
- * Fournit des données structurées : faction, genre, espèce, statut, âge
+ * Insère directement dans `characters` (is_active=true) + `character_aliases`.
  *
  * Usage : npx tsx scripts/import-snk.ts [--no-anilist]
  */
@@ -9,6 +9,7 @@ import { config } from 'dotenv'
 config({ path: '.env.local' })
 
 import { createClient } from '@supabase/supabase-js'
+import { slugify, normalizeString } from '../src/lib/utils/normalize'
 
 const ANIME_SLUG = 'snk'
 const BASE_URL = 'https://api.attackontitanapi.com/characters'
@@ -97,11 +98,17 @@ function buildDescription(char: SnkCharacter): string | null {
   return parts.join(', ') + '.'
 }
 
-/** Détermine si un personnage est "Main" basé sur ses rôles et sa faction */
-function deriveRoleSource(char: SnkCharacter): string {
+function deriveRoleType(char: SnkCharacter): 'main' | 'supporting' {
   const mainRoleKeywords = ['Commander', 'Captain', 'Special', 'Commanders']
   const isMain = char.roles.some(r => mainRoleKeywords.some(k => r.includes(k)))
-  return isMain ? 'Main' : 'Supporting'
+  return isMain ? 'main' : 'supporting'
+}
+
+function extractPowerType(char: SnkCharacter): string | null {
+  if (char.species.some(s => s.toLowerCase().includes('titan'))) {
+    return char.alias[0] ?? char.roles.find(r => r.includes('Titan')) ?? null
+  }
+  return null
 }
 
 // ─── Import ───────────────────────────────────────────────────────────────────
@@ -118,45 +125,19 @@ async function fetchAllCharacters(): Promise<SnkCharacter[]> {
     all.push(...data.results)
     hasMore = data.info.next_page !== null
     page++
-    if (hasMore) await sleep(300) // politesse
+    if (hasMore) await sleep(300)
   }
 
   return all
 }
 
-function buildStagingRow(char: SnkCharacter) {
-  const extracted = {
-    gender:            normalizeGender(char.gender),
-    faction:           extractFaction(char),
-    power_type:        null as string | null,
-    weapon_type:       null as string | null,
-    species:           extractSpecies(char),
-    status:            normalizeStatus(char.status),
-    age_range:         normalizeAgeRange(char.age),
-    description_short: buildDescription(char),
-  }
-
-  // Si Titan → le type de titan est le "pouvoir"
-  if (char.species.some(s => s.toLowerCase().includes('titan'))) {
-    const titanRole = char.alias[0] ?? char.roles.find(r => r.includes('Titan')) ?? null
-    if (titanRole) extracted.power_type = titanRole
-  }
-
-  return {
-    anime_slug:        ANIME_SLUG,
-    external_id:       char.id,
-    name:              char.name,
-    name_kanji:        null,
-    role_source:       deriveRoleSource(char),
-    favorites:         0,
-    image_url:         char.img,
-    raw_json:          { entry: char, extracted },
-    validated_at:      null,
-    validation_status: 'pending' as const,
-  }
-}
-
 async function main() {
+  // Récupérer l'anime_id
+  const { data: anime, error: animeErr } = await supabase
+    .from('animes').select('id').eq('slug', ANIME_SLUG).single()
+  if (animeErr || !anime) { console.error('[import-snk] Anime introuvable :', animeErr?.message); process.exit(1) }
+  const animeId = anime.id
+
   console.log(`[import-snk] Récupération des personnages depuis ${BASE_URL}…`)
 
   let characters: SnkCharacter[]
@@ -169,41 +150,66 @@ async function main() {
 
   console.log(`[import-snk] ${characters.length} personnages récupérés.`)
 
-  const rows = characters.map(buildStagingRow)
-
   let totalImported = 0
   let totalSkipped = 0
   const errs: string[] = []
 
-  for (let i = 0; i < rows.length; i += 20) {
-    const batch = rows.slice(i, i + 20)
-    const { data, error } = await supabase
-      .from('staging_characters')
-      .upsert(batch, { onConflict: 'anime_slug,external_id', ignoreDuplicates: true })
-      .select('id')
+  for (let i = 0; i < characters.length; i++) {
+    const char = characters[i]
 
-    if (error) {
-      console.error(`[import-snk] Erreur Supabase (lot ${i}) :`, error.message)
-      errs.push(error.message)
-    } else {
-      totalImported += data?.length ?? 0
-      totalSkipped += batch.length - (data?.length ?? 0)
+    process.stdout.write(`\r[import-snk] ${i + 1}/${characters.length} — ${char.name.padEnd(30)}`)
+
+    const slug = `${slugify(char.name)}-${char.id}`
+
+    const { data: upserted, error: charErr } = await supabase
+      .from('characters')
+      .upsert({
+        anime_id:           animeId,
+        slug,
+        name:               char.name,
+        display_name:       char.name,
+        gender:             normalizeGender(char.gender),
+        role_type:          deriveRoleType(char),
+        faction:            extractFaction(char),
+        power_type:         extractPowerType(char),
+        weapon_type:        null,
+        species:            extractSpecies(char),
+        status:             normalizeStatus(char.status),
+        age_range:          normalizeAgeRange(char.age),
+        description_short:  buildDescription(char),
+        difficulty:         'medium',
+        popularity_rank:    null,
+        source_external_id: String(char.id),
+        quote_ready:        false,
+        silhouette_ready:   false,
+        is_active:          true,
+      }, { onConflict: 'slug' })
+      .select('id')
+      .single()
+
+    if (charErr) {
+      errs.push(`${char.name} : ${charErr.message}`)
+      totalSkipped++
+      continue
     }
-    process.stdout.write(`\r[import-snk] ${Math.min(i + 20, rows.length)}/${rows.length}…`)
+
+    // Alias principal + aliases de l'API
+    await supabase.from('character_aliases').delete().eq('character_id', upserted.id)
+    const aliases = [char.name, ...char.alias.filter(a => a !== char.name)]
+    for (const alias of aliases) {
+      await supabase.from('character_aliases').insert({
+        character_id:     upserted.id,
+        alias,
+        normalized_alias: normalizeString(alias),
+      })
+    }
+
+    totalImported++
   }
 
   process.stdout.write('\n')
-  console.log(`[import-snk] ✓ ${totalImported} insérés, ${totalSkipped} doublons ignorés.` +
-    (errs.length ? ` ${errs.length} erreurs.` : ''))
-
-  // Log dans admin_import_logs
-  await supabase.from('admin_import_logs').insert({
-    anime_slug: ANIME_SLUG,
-    imported: totalImported,
-    skipped: totalSkipped,
-    errors: errs,
-    status: errs.length > 0 ? 'partial' : 'success',
-  })
+  console.log(`[import-snk] ✓ ${totalImported} insérés/mis à jour, ${totalSkipped} erreurs.` +
+    (errs.length ? `\n${errs.slice(0, 5).join('\n')}` : ''))
 }
 
 function sleep(ms: number) {

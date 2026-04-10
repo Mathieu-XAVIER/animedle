@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { compareCharacters } from '@/lib/game/compare'
 
-const MAX_ATTEMPTS = 6
-
 export async function POST(request: NextRequest) {
   const { challengeId, characterId, sessionId, targetCharacterId } = await request.json()
 
@@ -39,25 +37,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Personnage introuvable' }, { status: 404 })
   }
 
-  // Compter les essais de cette session
-  const { count: attemptsCount } = await supabase
-    .from('game_sessions')
-    .select('*', { count: 'exact', head: true })
-    .eq('session_id', sessionId)
-    .eq('challenge_id', challengeId)
-
-  const currentAttempt = (attemptsCount ?? 0) + 1
   const isCorrect = guessChar.id === targetChar.id
-  const isOver = isCorrect || currentAttempt >= MAX_ATTEMPTS
 
   // Enregistrer uniquement pour les défis officiels (pas l'illimité)
   if (!targetCharacterId) {
+    const { count: attemptsCount } = await supabase
+      .from('game_sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('session_id', sessionId)
+      .eq('challenge_id', challengeId)
+
     await supabase.from('game_sessions').insert({
-      session_id: sessionId,
+      session_id:  sessionId,
       challenge_id: challengeId,
-      game_mode: gameMode as 'classique' | 'citation' | 'silhouette',
-      attempts: currentAttempt,
-      is_won: isCorrect,
+      game_mode:   gameMode as 'classique' | 'citation' | 'silhouette',
+      attempts:    (attemptsCount ?? 0) + 1,
+      is_won:      isCorrect,
     })
   }
 
@@ -66,28 +61,27 @@ export async function POST(request: NextRequest) {
   const response: Record<string, unknown> = {
     comparison,
     isCorrect,
-    attemptsCount: currentAttempt,
-    maxAttempts: MAX_ATTEMPTS,
     guessCharacter: {
-      id: guessChar.id,
-      display_name: guessChar.display_name,
-      anime_id: guessChar.anime_id,
-      gender: guessChar.gender,
-      role_type: guessChar.role_type,
-      faction: guessChar.faction,
-      power_type: guessChar.power_type,
-      weapon_type: guessChar.weapon_type,
-      status: guessChar.status,
-      species: guessChar.species,
-      age_range: guessChar.age_range,
+      id:              guessChar.id,
+      display_name:    guessChar.display_name,
+      anime_id:        guessChar.anime_id,
+      gender:          guessChar.gender,
+      role_type:       guessChar.role_type,
+      faction:         guessChar.faction,
+      power_type:      guessChar.power_type,
+      weapon_type:     guessChar.weapon_type,
+      status:          guessChar.status,
+      species:         guessChar.species,
+      age_range:       guessChar.age_range,
+      popularity_rank: guessChar.popularity_rank,
     },
   }
 
-  if (isOver) {
+  if (isCorrect) {
     response.targetCharacter = {
-      id: targetChar.id,
+      id:           targetChar.id,
       display_name: targetChar.display_name,
-      anime_id: targetChar.anime_id,
+      anime_id:     targetChar.anime_id,
     }
   }
 
